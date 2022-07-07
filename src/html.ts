@@ -28,8 +28,6 @@ export default {
                 json,
                 time: Date.now() + time_in_queue,
             };
-            console.log("Storing", msg);
-
             queue.push(msg);
         } catch (e) {
             console.error("unable to parse json", e);
