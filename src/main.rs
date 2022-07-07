@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow, Context};
 use clap::Parser;
 use reqwest::Client;
 use std::{sync::{
@@ -48,16 +49,19 @@ struct Stats {
     success: AtomicUsize,
 }
 
-async fn send_request(client: Client, url: &str, stats: &Stats) {
+async fn send_request(client: Client, url: &str, stats: &Stats) -> Result<String> {
     let resp = match reqwest::get(url).await {
         Ok(r) => r,
         Err(_) => {
             stats.error.fetch_add(1, Ordering::Relaxed);
-            return;
+            return Err(anyhow!("unable to make the reqwest"));
         }
     };
 
+    let text = resp.text().await;
+
     stats.success.fetch_add(1, Ordering::Relaxed);
+    return text.context("sorry, this sucked");
 }
 
 #[tokio::main]
@@ -93,12 +97,27 @@ async fn main() {
     let total_time = now.elapsed().as_secs();
     let success = stats.success.load(Ordering::Relaxed);
     let error = stats.error.load(Ordering::Relaxed);
-
-    println!("total_time: {} success {} errors {}", total_time, success, error);
     let rps = args.count as u64 / total_time;
-    let average_ssr = stats.total_time_taken.load(Ordering::Relaxed) / success;
 
-    println!("rps: {}, average_ssr: {}", rps, average_ssr);
+    println!("total_time: {} success {} errors {} rps {}", total_time, success, error, rps);
+
+    let url = Arc::new(format!("http://{}:{}/status", args.address, args.port));
+    loop {
+        println!("waiting 1 second and seeing if server is done");
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        match send_request(client.clone(), &url, &stats).await {
+            Ok(out) => {
+                println!("just got this back from the server {}", out);
+                if let Ok(x) = str::parse::<usize>(&out) {
+                    if x == 0 {
+                        println!("all dn");
+                        break;
+                    }
+                };
+            },
+            Err(e) => {
+                println!("just got a sweet error {}", e);
+            }
+        }
+    }
 }
-
-
