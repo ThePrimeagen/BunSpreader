@@ -2,4 +2,6 @@
 
 !src/*
 !package.json
+!Cargo.toml
+!Cargo.lock
 

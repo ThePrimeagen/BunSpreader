@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow, Context};
+use app::json::{JsonMessage, InnerJsonMessage};
 use clap::Parser;
 use reqwest::Client;
 use std::{sync::{
@@ -6,23 +7,6 @@ use std::{sync::{
     Arc,
 }, time::Duration};
 use tokio::{sync::Semaphore, time::Instant};
-use serde::{Serialize, Deserialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct InnerJsonMessage {
-    width: i32,
-    height: i32,
-    girth: i32,
-    depth: i32,
-    length: i32,
-    circumference: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct JsonMessage {
-    message: String,
-    another_property: InnerJsonMessage,
-}
 
 #[derive(Parser)]
 struct Args {
@@ -49,8 +33,27 @@ struct Stats {
     success: AtomicUsize,
 }
 
+async fn get_status(client: Client, url: &str) -> Result<String> {
+    let resp = match client
+            .get(url)
+            .send().await {
+        Ok(r) => r,
+        Err(_) => {
+            return Err(anyhow!("unable to make the reqwest"));
+        }
+    };
+
+    let text = resp.text().await;
+
+    return text.context("sorry, this sucked");
+}
+
 async fn send_request(client: Client, url: &str, stats: &Stats, body: String) -> Result<String> {
-    let resp = match client.post(url).body(body).send().await {
+    let resp = match client
+            .post(url)
+            .header("content-type", "application/json")
+            .body(body)
+            .send().await {
         Ok(r) => r,
         Err(_) => {
             stats.error.fetch_add(1, Ordering::Relaxed);
@@ -72,7 +75,9 @@ async fn main() -> Result<()> {
 
     let semaphore = Arc::new(Semaphore::new(args.max_conn));
 
-    let url = Arc::new(format!("http://{}:{}/json/{}", args.address, args.port, args.time_in_queue));
+    let url = format!("http://{}:{}/json/{}", args.address, args.port, args.time_in_queue);
+    println!("using this url {}", url);
+    let url = Arc::new(url);
     let mut handles = vec![];
 
     let now = Instant::now();
@@ -89,7 +94,11 @@ async fn main() -> Result<()> {
     };
     let body = serde_json::to_string(&body)?;
 
-    for _ in 0..args.count {
+    for i in 0..args.count {
+        if i % 10 == 0 {
+            println!("look at my i {}", i);
+        }
+
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let client = client.clone();
         let stats = stats.clone();
@@ -108,10 +117,10 @@ async fn main() -> Result<()> {
         }
     }).await.unwrap_or(());
 
-    let total_time = now.elapsed().as_secs();
+    let total_time = now.elapsed().as_millis();
     let success = stats.success.load(Ordering::Relaxed);
     let error = stats.error.load(Ordering::Relaxed);
-    let rps = args.count as u64 / total_time;
+    let rps = args.count as u64 / (total_time as u64);
 
     println!("total_time: {} success {} errors {} rps {}", total_time, success, error, rps);
 
@@ -122,7 +131,7 @@ async fn main() -> Result<()> {
     loop {
         println!("waiting 1 second and seeing if server is done");
         tokio::time::sleep(Duration::from_millis(1000)).await;
-        match send_request(client.clone(), &url, &stats, body.clone()).await {
+        match get_status(client.clone(), &url).await {
             Ok(out) => {
                 println!("just got this back from the server {}", out);
                 if let Ok(x) = str::parse::<usize>(&out) {
