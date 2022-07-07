@@ -49,8 +49,8 @@ struct Stats {
     success: AtomicUsize,
 }
 
-async fn send_request(client: Client, url: &str, stats: &Stats) -> Result<String> {
-    let resp = match reqwest::get(url).await {
+async fn send_request(client: Client, url: &str, stats: &Stats, body: String) -> Result<String> {
+    let resp = match client.post(url).body(body).send().await {
         Ok(r) => r,
         Err(_) => {
             stats.error.fetch_add(1, Ordering::Relaxed);
@@ -65,7 +65,7 @@ async fn send_request(client: Client, url: &str, stats: &Stats) -> Result<String
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = Args::parse();
     let client = Client::new();
     let stats = Arc::new(Stats::default());
@@ -76,14 +76,28 @@ async fn main() {
     let mut handles = vec![];
 
     let now = Instant::now();
+    let body = JsonMessage {
+        message: "me daddy".to_string(),
+        another_property: InnerJsonMessage {
+            width: 4,
+            height: 6,
+            girth: 8,
+            depth: 10,
+            length: 12,
+            circumference: 14,
+        }
+    };
+    let body = serde_json::to_string(&body)?;
+
     for _ in 0..args.count {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let client = client.clone();
         let stats = stats.clone();
         let url = url.clone();
+        let body = body.clone();
 
         handles.push(tokio::spawn(async move {
-            send_request(client, &url, &stats).await;
+            send_request(client, &url, &stats, body).await;
             drop(permit);
         }));
     }
@@ -101,11 +115,14 @@ async fn main() {
 
     println!("total_time: {} success {} errors {} rps {}", total_time, success, error, rps);
 
-    let url = Arc::new(format!("http://{}:{}/status", args.address, args.port));
+    let url = format!("http://{}:{}/status", args.address, args.port);
+    println!("url {}", url);
+    let url = Arc::new(url);
+
     loop {
         println!("waiting 1 second and seeing if server is done");
         tokio::time::sleep(Duration::from_millis(1000)).await;
-        match send_request(client.clone(), &url, &stats).await {
+        match send_request(client.clone(), &url, &stats, body.clone()).await {
             Ok(out) => {
                 println!("just got this back from the server {}", out);
                 if let Ok(x) = str::parse::<usize>(&out) {
@@ -120,4 +137,5 @@ async fn main() {
             }
         }
     }
+    return Ok(());
 }

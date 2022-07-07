@@ -24,10 +24,13 @@ export default {
 
         try {
             const json = await request.json();
-            queue.push({
+            const msg = {
                 json,
                 time: Date.now() + time_in_queue,
-            });
+            };
+            console.log("Storing", msg);
+
+            queue.push(msg);
         } catch (e) {
             console.error("unable to parse json", e);
         }
