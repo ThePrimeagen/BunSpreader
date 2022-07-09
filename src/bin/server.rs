@@ -1,7 +1,5 @@
-use anyhow::{Result, anyhow};
-use lockfree::prelude::Queue;
 use tokio::sync::Mutex;
-use std::{time::{Instant, SystemTime, UNIX_EPOCH}, collections::VecDeque, cell::RefCell, sync::{atomic::{AtomicUsize, Ordering, AtomicIsize}, Arc}};
+use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize}, Arc}};
 
 use app::json::JsonMessage;
 use actix_web::{get, web, Responder, HttpResponse, HttpServer, App, post};
@@ -11,6 +9,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 struct QueueMessage {
     time: u128,
+
     message: JsonMessage,
 }
 
@@ -47,7 +46,6 @@ impl MyQueue {
                 break;
             }
         }
-
         msg.map(|x| {
             self.length.fetch_add(1, Ordering::Relaxed);
             queue.push_back(x);
