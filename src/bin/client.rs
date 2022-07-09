@@ -10,16 +10,16 @@ use tokio::{sync::Semaphore, time::Instant};
 
 #[derive(Parser)]
 struct Args {
-    #[clap(short = 't', long = "time", default_value= "10000")]
+    #[clap(env = "TIQ", short = 't', long = "time", default_value= "10000")]
     time_in_queue: usize,
 
     #[clap(env = "COUNT", short = 'c', long = "count", default_value= "1000")]
     count: usize,
 
-    #[clap(short = 'a', long = "address", default_value= "0.0.0.0")]
+    #[clap(env = "ADDR", short = 'a', long = "address", default_value= "0.0.0.0")]
     address: String,
 
-    #[clap(short = 'p', long = "port", default_value = "42069")]
+    #[clap(env = "PORT", short = 'p', long = "port", default_value = "42069")]
     port: u16,
 
     #[clap(env = "MAX_CONN", short = 'm', long = "max_conn", default_value = "100")]
