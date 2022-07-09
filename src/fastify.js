@@ -16,7 +16,7 @@ function empty_queue() {
 fastify.post("/json/:time_in_queue", async (request, reply) => {
     empty_queue();
 
-    let time_in_queue = request.params.time_in_queue;
+    let time_in_queue = 15000;
     let json = request.body;
 
     const msg = {
@@ -29,9 +29,10 @@ fastify.post("/json/:time_in_queue", async (request, reply) => {
 });
 
 fastify.get("/status", async (request, reply) => {
+    empty_queue();
     return `${queue.length}`;
 });
 
-fastify.listen({ port: 3000 }, (err, address) => {
+fastify.listen({ host: "0.0.0.0", port: 3000 }, (err, address) => {
 });
 
