@@ -1,6 +1,7 @@
 *
 
 !src/*
+!package.fastify.json
 !package.json
 !Cargo.toml
 !Cargo.lock

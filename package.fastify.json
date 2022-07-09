@@ -1,0 +1,9 @@
+{
+  "name": "app",
+  "version": "0.0.46",
+  "dependencies": {
+    "fastify": "^4.2.0"
+  },
+  "devDependencies": { }
+}
+
