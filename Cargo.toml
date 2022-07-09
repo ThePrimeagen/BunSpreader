@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 actix-web = "4.1.0"
 anyhow = "1.0.58"
-clap = { version = "3.2.8", features = ["derive"] }
+clap = { version = "3.2.8", features = ["derive", "env"] }
 lockfree = "0.5.1"
 num_cpus = "1.13.1"
 reqwest = "0.11.11"
