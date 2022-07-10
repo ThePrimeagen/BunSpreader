@@ -4,12 +4,50 @@ const fastify = require('fastify')({
     logger: false
 });
 
-const queue = [];
+class List {
+    constructor() {
+        this.length = 0;
+        this.head = this.tail = undefined;
+    }
+
+    enqueue(time) {
+        this.length++;
+        const node = {time, next: undefined};
+        if (!this.head) {
+            this.head = this.tail = node;
+            return;
+        }
+
+        this.tail.next = node;
+        this.tail = node;
+    }
+    peek() {
+        if (!this.head) {
+            return undefined;
+        }
+
+        return this.head.time.time;
+    }
+
+    deque() {
+        this.length--;
+        if (!this.head) {
+            return;
+        }
+
+        const node = this.head;
+        this.head = this.head.next;
+        node.next = undefined;
+    }
+}
+
+const queue = new List();
 
 function empty_queue() {
     const now = Date.now();
-    while (queue.length > 0 && queue[0].time < now) {
-        queue.shift();
+    const peeked = queue.peek();
+    while (queue.peek() !== undefined && queue.peek() < now) {
+        queue.deque();
     }
 }
 
@@ -23,7 +61,7 @@ fastify.post("/json/:time_in_queue", async (request, reply) => {
         json,
         time: Date.now() + time_in_queue,
     };
-    queue.push(msg);
+    queue.enqueue(msg);
 
     return `time in queue will be ${time_in_queue}`;
 });

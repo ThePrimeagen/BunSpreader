@@ -18,7 +18,7 @@ class List {
     enqueue(time: Message) {
         this.length++;
         const node = {time, next: undefined};
-        if (!this.head && !this.tail) {
+        if (!this.head) {
             this.head = this.tail = node;
             return;
         }
@@ -50,6 +50,7 @@ const queue = new List();
 
 function empty_queue() {
     const now = Date.now();
+    const peeked = queue.peek();
     while (queue.peek() !== undefined && queue.peek() < now) {
         queue.deque();
     }
