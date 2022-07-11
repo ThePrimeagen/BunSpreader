@@ -1,5 +1,5 @@
 use tokio::sync::Mutex;
-use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize}, Arc}};
+use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize}}};
 
 use app::json::JsonMessage;
 use actix_web::{get, web, Responder, HttpResponse, HttpServer, App, post};
@@ -14,13 +14,13 @@ struct QueueMessage {
 }
 
 struct MyQueue {
-    queue: Arc<Mutex<VecDeque<QueueMessage>>>,
+    queue: Mutex<VecDeque<QueueMessage>>,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
         return MyQueue {
-            queue: Arc::new(Mutex::new(VecDeque::new())),
+            queue: Mutex::new(VecDeque::new()),
         }
     }
 }
