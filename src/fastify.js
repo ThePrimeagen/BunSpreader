@@ -4,6 +4,9 @@ const fastify = require('fastify')({
     logger: false
 });
 
+const cluster = require('cluster');
+const numCPUs = require('os').cpus().length;
+
 class List {
     constructor() {
         this.length = 0;
@@ -71,6 +74,29 @@ fastify.get("/status", async (request, reply) => {
     return `${queue.length}`;
 });
 
-fastify.listen({ host: "0.0.0.0", port: 3000 }, (err, address) => {
-});
+const port = process.env.PORT || 3000
 
+if (cluster.isPrimary) {
+  console.log(`Primary ${process.pid} is running`);
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+    cluster.on('exit', (worker, code, signal) => {
+      if (signal) {
+        console.log(`worker was killed by signal: ${signal}`);
+      } else if (code !== 0) {
+        console.log(`worker exited with error code: ${code} spawning new worker`);
+        cluster.fork();
+      } else {
+        console.log('worker success!');
+      }
+    });
+  }
+} else {
+  fastify.listen({port: port, host: "::"}, (err, address) => {
+    if (err) {
+      console.error(err)
+      process.exit(1)
+    }
+    console.log(`Server listening at ${address}`)
+  });
+}
