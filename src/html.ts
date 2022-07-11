@@ -50,7 +50,6 @@ const queue = new List();
 
 function empty_queue() {
     const now = Date.now();
-    const peeked = queue.peek();
     while (queue.peek() !== undefined && queue.peek() < now) {
         queue.deque();
     }
