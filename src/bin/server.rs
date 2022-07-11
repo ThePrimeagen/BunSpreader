@@ -15,14 +15,12 @@ struct QueueMessage {
 
 struct MyQueue {
     queue: Arc<Mutex<VecDeque<QueueMessage>>>,
-    length: AtomicIsize,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
         return MyQueue {
             queue: Arc::new(Mutex::new(VecDeque::new())),
-            length: AtomicIsize::new(0),
         }
     }
 }
@@ -36,20 +34,19 @@ fn get_now() -> u128 {
 }
 
 impl MyQueue {
-    async fn empty_queue(&self, now: u128, msg: Option<QueueMessage>) {
+    async fn empty_queue(&self, now: u128, msg: Option<QueueMessage>) -> usize {
         let mut queue = self.queue.lock().await;
         while let Some(item) = queue.get(0) {
             if item.time < now {
                 queue.pop_front();
-                self.length.fetch_add(-1, Ordering::Relaxed);
             } else {
                 break;
             }
         }
         msg.map(|x| {
-            self.length.fetch_add(1, Ordering::Relaxed);
             queue.push_back(x);
         });
+        queue.len()
     }
 }
 
@@ -57,8 +54,8 @@ impl MyQueue {
 async fn json(req: web::Json<JsonMessage>, data: web::Data<MyQueue>, time_in_queue: web::Path<usize>) -> impl Responder {
     let now = get_now();
     data.empty_queue(now, Some(QueueMessage {
-        time: get_now() + (*time_in_queue as u128),
-        message: req.clone(),
+        time: now + (*time_in_queue as u128),
+        message: req.0,
     })).await;
 
     let resp = HttpResponse::Ok()
@@ -71,9 +68,8 @@ async fn json(req: web::Json<JsonMessage>, data: web::Data<MyQueue>, time_in_que
 #[get("/status")]
 async fn status(data: web::Data<MyQueue>) -> impl Responder {
     let now = get_now();
-    data.empty_queue(now, None).await;
+    let len = data.empty_queue(now, None).await;
 
-    let len = data.length.load(Ordering::Relaxed);
     let resp = HttpResponse::Ok()
         .content_type("text/html")
         .body(format!("{}", len));
