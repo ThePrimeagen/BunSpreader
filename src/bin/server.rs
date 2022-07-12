@@ -1,4 +1,4 @@
-use lockfree::prelude::Set;
+use lockfree::prelude::Map;
 use std::{
     hash::Hash,
     sync::{
@@ -16,6 +16,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn gen_id() -> u64 {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
@@ -26,40 +27,14 @@ struct Item {
     message: JsonMessage,
 }
 
-impl PartialEq for Item {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl PartialOrd for Item {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-
-impl Eq for Item {}
-
-impl Ord for Item {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-impl Hash for Item {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
-
 struct MyQueue {
-    queue: Arc<Set<Item>>,
+    queue: Arc<Map<u64, Item>>,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
         return MyQueue {
-            queue: Arc::new(Set::new()),
+            queue: Arc::new(Map::new()),
         };
     }
 }
@@ -77,15 +52,15 @@ impl MyQueue {
         let mut count = 0;
 
         for item in self.queue.iter() {
-            if item.time < now {
-                self.queue.remove(&item);
+            if item.1.time < now {
+                self.queue.remove(&item.0);
             } else {
                 count += 1;
             }
         }
 
         if let Some(msg) = msg {
-            self.queue.insert(msg).ok();
+            self.queue.insert(msg.id, msg);
             count += 1;
         }
 
