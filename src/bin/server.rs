@@ -2,11 +2,12 @@ use lockfree::prelude::Map;
 use std::{
     hash::Hash,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
     time::{SystemTime, UNIX_EPOCH},
 };
+use tokio::time::{sleep_until, Duration};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use app::json::JsonMessage;
@@ -21,50 +22,42 @@ fn gen_id() -> u64 {
 }
 
 #[derive(Debug)]
-struct Item {
+struct QueueMessage {
     id: u64,
-    time: u128,
+    time: u64,
     message: JsonMessage,
 }
 
+#[derive(Clone)]
 struct MyQueue {
-    queue: Arc<Map<u64, Item>>,
+    queue: Arc<Map<u64, QueueMessage>>,
+    count: Arc<AtomicU32>,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
         return MyQueue {
             queue: Arc::new(Map::new()),
+            count: Default::default(),
         };
     }
 }
 
-fn get_now() -> u128 {
-    let start = SystemTime::now();
-    return start
-        .duration_since(UNIX_EPOCH)
-        .expect("I hate my life and this shouldn't of failed so fu unix")
-        .as_millis();
-}
-
 impl MyQueue {
-    async fn empty_queue(&self, now: u128, msg: Option<Item>) -> usize {
-        let mut count = 0;
+    fn add_item(&self, item: QueueMessage) {
+        let id = item.id;
+        let exp = item.time;
 
-        for item in self.queue.iter() {
-            if item.1.time < now {
-                self.queue.remove(&item.0);
-            } else {
-                count += 1;
-            }
-        }
+        self.queue.insert(id, item);
+        self.count.fetch_add(1, Ordering::SeqCst);
 
-        if let Some(msg) = msg {
-            self.queue.insert(msg.id, msg);
-            count += 1;
-        }
+        let this = self.clone();
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(exp)).await;
 
-        count
+            this.queue.remove(&id);
+            this.count.fetch_sub(1, Ordering::SeqCst);
+        });
     }
 }
 
@@ -74,16 +67,11 @@ async fn json(
     data: web::Data<MyQueue>,
     time_in_queue: web::Path<usize>,
 ) -> impl Responder {
-    let now = get_now();
-    data.empty_queue(
-        now,
-        Some(Item {
-            id: gen_id(),
-            time: now + (*time_in_queue as u128),
-            message: req.0,
-        }),
-    )
-    .await;
+    data.add_item(QueueMessage {
+        id: gen_id(),
+        time: *time_in_queue as _,
+        message: req.0,
+    });
 
     let resp = HttpResponse::Ok()
         .content_type("text/html")
@@ -94,12 +82,10 @@ async fn json(
 
 #[get("/status")]
 async fn status(data: web::Data<MyQueue>) -> impl Responder {
-    let now = get_now();
-    let len = data.empty_queue(now, None).await;
-
+    let count = data.count.load(Ordering::SeqCst);
     let resp = HttpResponse::Ok()
         .content_type("text/html")
-        .body(format!("{}", len));
+        .body(format!("{}", count));
 
     return resp;
 }
