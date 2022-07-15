@@ -1,7 +1,9 @@
 {
+    "includes": ["./src/**/*"],
     "compilerOptions": {
-        "types": ["bun-types", "node_modules/@types", "jest"],
-
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "target": "es2015",
         "outDir": "dist"
     }
 }

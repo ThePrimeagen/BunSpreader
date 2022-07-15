@@ -1,9 +1,10 @@
-const queue = new RingBuffer();
+import { Message, RingBuffer } from "./boofer";
+
+const queue = new RingBuffer<Message>();
 
 function empty_queue() {
     const now = Date.now();
-    console.log("peek", queue.peek(), now);
-    while (queue.peek() !== undefined && queue.peek() < now) {
+    while (queue.peek() !== undefined && queue.peek().time < now) {
         queue.deque();
     }
 }

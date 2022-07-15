@@ -1,4 +1,5 @@
-import { RingBuffer } from "../html";
+import { RingBuffer } from "../boofer";
+
 
 test("Ring Buffer", function() {
     const buffer = new RingBuffer<number>();

@@ -1,7 +1,10 @@
 *
 
+!dist/*
+!dist/src/*
 !src/*
 !package.fastify.json
+!tsconfig.json
 !package.json
 !Cargo.toml
 !Cargo.lock
