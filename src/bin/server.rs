@@ -1,62 +1,77 @@
-use tokio::sync::Mutex;
-use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize}, Arc}};
+use lockfree::prelude::Map;
+use std::{
+    hash::Hash,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::time::{sleep_until, Duration};
 
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use app::json::JsonMessage;
-use actix_web::{get, web, Responder, HttpResponse, HttpServer, App, post};
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-struct QueueMessage {
-    time: u128,
+fn gen_id() -> u64 {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
+    COUNTER.fetch_add(1, Ordering::SeqCst)
+}
+
+#[derive(Debug)]
+struct QueueMessage {
+    id: u64,
+    time: u64,
     message: JsonMessage,
 }
 
+#[derive(Clone)]
 struct MyQueue {
-    queue: Arc<Mutex<VecDeque<QueueMessage>>>,
+    queue: Arc<Map<u64, QueueMessage>>,
+    count: Arc<AtomicU32>,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
         return MyQueue {
-            queue: Arc::new(Mutex::new(VecDeque::new())),
-        }
+            queue: Arc::new(Map::new()),
+            count: Default::default(),
+        };
     }
 }
 
-fn get_now() -> u128 {
-    let start = SystemTime::now();
-    return start
-        .duration_since(UNIX_EPOCH)
-        .expect("I hate my life and this shouldn't of failed so fu unix")
-        .as_millis();
-}
-
 impl MyQueue {
-    async fn empty_queue(&self, now: u128, msg: Option<QueueMessage>) -> usize {
-        let mut queue = self.queue.lock().await;
-        while let Some(item) = queue.get(0) {
-            if item.time < now {
-                queue.pop_front();
-            } else {
-                break;
-            }
-        }
-        msg.map(|x| {
-            queue.push_back(x);
+    fn add_item(&self, item: QueueMessage) {
+        let id = item.id;
+        let exp = item.time;
+
+        self.queue.insert(id, item);
+        self.count.fetch_add(1, Ordering::SeqCst);
+
+        let this = self.clone();
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(exp)).await;
+
+            this.queue.remove(&id);
+            this.count.fetch_sub(1, Ordering::SeqCst);
         });
-        queue.len()
     }
 }
 
 #[post("/json/{time_in_queue}")]
-async fn json(req: web::Json<JsonMessage>, data: web::Data<MyQueue>, time_in_queue: web::Path<usize>) -> impl Responder {
-    let now = get_now();
-    data.empty_queue(now, Some(QueueMessage {
-        time: now + (*time_in_queue as u128),
+async fn json(
+    req: web::Json<JsonMessage>,
+    data: web::Data<MyQueue>,
+    time_in_queue: web::Path<usize>,
+) -> impl Responder {
+    data.add_item(QueueMessage {
+        id: gen_id(),
+        time: *time_in_queue as _,
         message: req.0,
-    })).await;
+    });
 
     let resp = HttpResponse::Ok()
         .content_type("text/html")
@@ -67,19 +82,18 @@ async fn json(req: web::Json<JsonMessage>, data: web::Data<MyQueue>, time_in_que
 
 #[get("/status")]
 async fn status(data: web::Data<MyQueue>) -> impl Responder {
-    let now = get_now();
-    let len = data.empty_queue(now, None).await;
-
+    let count = data.count.load(Ordering::SeqCst);
     let resp = HttpResponse::Ok()
         .content_type("text/html")
-        .body(format!("{}", len));
+        .body(format!("{}", count));
 
     return resp;
 }
 
 #[tokio::main] // or #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let workers: usize = str::parse(&std::env::var("WORKERS").unwrap_or("1".to_string())).unwrap_or(1);
+    let workers: usize =
+        str::parse(&std::env::var("WORKERS").unwrap_or("1".to_string())).unwrap_or(1);
 
     let topics: web::Data<MyQueue> = web::Data::new(MyQueue::default());
 
@@ -95,6 +109,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-
-
-
