@@ -1,55 +1,8 @@
-type Message = {
-    message: any,
-    time: number,
-}
-type Node = {
-    time: Message;
-    next?: Node;
-}
-
-class List {
-    private head?: Node;
-    private tail?: Node;
-    public length: number;
-    constructor() {
-        this.length = 0;
-    }
-
-    enqueue(time: Message) {
-        this.length++;
-        const node = {time, next: undefined};
-        if (!this.head) {
-            this.head = this.tail = node;
-            return;
-        }
-
-        this.tail.next = node;
-        this.tail = node;
-    }
-    peek(): number | undefined {
-        if (!this.head) {
-            return undefined;
-        }
-
-        return this.head.time.time;
-    }
-
-    deque() {
-        this.length--;
-        if (!this.head) {
-            return;
-        }
-
-        const node = this.head;
-        this.head = this.head.next;
-        node.next = undefined;
-    }
-}
-
-const queue = new List();
+const queue = new RingBuffer();
 
 function empty_queue() {
     const now = Date.now();
+    console.log("peek", queue.peek(), now);
     while (queue.peek() !== undefined && queue.peek() < now) {
         queue.deque();
     }

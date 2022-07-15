@@ -1,51 +1,14 @@
 "use strict"
 
+const boofer = require("./boofer");
 const fastify = require('fastify')({
     logger: false
 });
 
-class List {
-    constructor() {
-        this.length = 0;
-        this.head = this.tail = undefined;
-    }
-
-    enqueue(time) {
-        this.length++;
-        const node = {time, next: undefined};
-        if (!this.head) {
-            this.head = this.tail = node;
-            return;
-        }
-
-        this.tail.next = node;
-        this.tail = node;
-    }
-    peek() {
-        if (!this.head) {
-            return undefined;
-        }
-
-        return this.head.time.time;
-    }
-
-    deque() {
-        this.length--;
-        if (!this.head) {
-            return;
-        }
-
-        const node = this.head;
-        this.head = this.head.next;
-        node.next = undefined;
-    }
-}
-
-const queue = new List();
+const queue = new boofer.RingBuffer();
 
 function empty_queue() {
     const now = Date.now();
-    const peeked = queue.peek();
     while (queue.peek() !== undefined && queue.peek() < now) {
         queue.deque();
     }

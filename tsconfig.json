@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "types": ["bun-types"]
+        "types": ["bun-types", "node_modules/@types", "jest"],
+        "outDir": "dist"
     }
 }
 
