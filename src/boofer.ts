@@ -3,6 +3,59 @@ export type Message = {
     time: number,
 }
 
+type Node<T> = {
+    value: T;
+    next?: Node<T>;
+}
+
+export interface Queue<T> {
+    readonly length: number;
+    enqueue(time: T): void;
+    peek(): T | undefined;
+    deque(): T;
+}
+
+export class List<T> {
+    private head?: Node<T>;
+    private tail?: Node<T>;
+    public length: number;
+    constructor() {
+        this.length = 0;
+    }
+
+    enqueue(time: T) {
+        this.length++;
+        const node = {value: time, next: undefined};
+        if (!this.head) {
+            this.head = this.tail = node;
+            return;
+        }
+
+        this.tail.next = node;
+        this.tail = node;
+    }
+    peek(): T | undefined {
+        if (!this.head) {
+            return undefined;
+        }
+
+        return this.head.value;
+    }
+
+    deque(): T {
+        this.length--;
+        if (!this.head) {
+            return;
+        }
+
+        const node = this.head;
+        this.head = this.head.next;
+        node.next = undefined;
+
+        return node.value;
+    }
+}
+
 export class RingBuffer<T> {
     private data: T[];
     public length: number;

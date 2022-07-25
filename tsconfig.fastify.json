@@ -1,0 +1,8 @@
+{
+    "compilerOptions": {
+        "types": ["jest"],
+        "outDir": "dist"
+    }
+}
+
+

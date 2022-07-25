@@ -1,7 +1,5 @@
-use flume::{Receiver, Sender};
-use lockfree::prelude::Queue as LFQueue;
 use tokio::sync::Mutex;
-use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize, AtomicUsize}, Arc}};
+use std::{time::{SystemTime, UNIX_EPOCH}, collections::VecDeque, sync::{atomic::{Ordering, AtomicIsize}, Arc}};
 
 use app::json::JsonMessage;
 use actix_web::{get, web, Responder, HttpResponse, HttpServer, App, post};
@@ -11,37 +9,18 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 struct QueueMessage {
     time: u128,
+
     message: JsonMessage,
 }
 
-impl Default for QueueMessage {
-    fn default() -> Self {
-        return Self {
-            time: 0,
-            message: JsonMessage::default(),
-        };
-    }
-}
-
 struct MyQueue {
-    tx_queue: Sender<QueueMessage>,
-    tx_peek: Sender<QueueMessage>,
-    queue: Receiver<QueueMessage>,
-    peek: Receiver<QueueMessage>,
-    len: AtomicUsize,
+    queue: Arc<Mutex<VecDeque<QueueMessage>>>,
 }
 
 impl Default for MyQueue {
     fn default() -> Self {
-        let (tx_queue, queue) = flume::bounded(1_000_000);
-        let (tx_peek, peek) = flume::bounded(100);
-
         return MyQueue {
-            queue,
-            peek,
-            tx_queue,
-            tx_peek,
-            len: AtomicUsize::new(0),
+            queue: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 }
@@ -56,42 +35,18 @@ fn get_now() -> u128 {
 
 impl MyQueue {
     async fn empty_queue(&self, now: u128, msg: Option<QueueMessage>) -> usize {
-        let mut count: isize = 0;
-        let mut check = true;
-        while let Ok(item) = self.peek.try_recv() {
-            if item.time > now {
-                self.tx_peek.send(item).expect("always blue");
-                check = false;
-                break;
+        let mut queue = self.queue.lock().await;
+        while let Some(item) = queue.get(0) {
+            if item.time < now {
+                queue.pop_front();
             } else {
-                count -= 1;
+                break;
             }
         }
-
-        if check {
-            while let Ok(item) = self.queue.try_recv() {
-                if item.time < now {
-                    count -= 1;
-                } else {
-                    self.tx_peek.send(item).expect("always blue");
-                    break;
-                }
-            }
-        }
-
-        msg.map(|m| {
-            self.tx_queue.send(m).expect("always blue");
-            count += 1;
+        msg.map(|x| {
+            queue.push_back(x);
         });
-
-        return if count > 0 {
-            self.len.fetch_add(count as usize, Ordering::Relaxed)
-        } else if count < 0 {
-            // TODO: I am terrible
-            self.len.fetch_sub((-1 * count) as usize, Ordering::Relaxed)
-        } else {
-            self.len.load(Ordering::Relaxed)
-        };
+        queue.len()
     }
 }
 
@@ -140,6 +95,8 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
+
+
 
 
 

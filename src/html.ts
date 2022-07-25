@@ -1,6 +1,9 @@
-import { Message, RingBuffer } from "./boofer";
+import { Message, RingBuffer, List, Queue } from "./boofer";
 
-const queue = new RingBuffer<Message>();
+let queue: Queue<Message> = new List();
+if (process.argv[2] === "buf" || process.env["QUEUE"] === "buf") {
+    queue = new RingBuffer(5);
+}
 
 function empty_queue() {
     const now = Date.now();
@@ -32,7 +35,6 @@ export default {
             };
             queue.enqueue(msg);
         } catch (e) {
-            console.error("unable to parse json", e);
         }
 
         return new Response(`time in queue will be ${time_in_queue}`);

@@ -1,3 +1,4 @@
+/*
 use anyhow::{Result, anyhow, Context};
 use app::json::{JsonMessage, InnerJsonMessage};
 use clap::Parser;
@@ -88,4 +89,7 @@ fn handle_connection(mut stream: TcpStream) {
     stream.read(&mut buffer).unwrap();
 
     let request = String::from_utf8_lossy(&buffer[..])
+}
+*/
+fn main() {
 }

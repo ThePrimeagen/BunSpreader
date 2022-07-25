@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+while [[ 1 -eq 1 ]]; do
+curl "http://45.33.62.13:3000/status"
+echo ""
+sleep 1
+done
+

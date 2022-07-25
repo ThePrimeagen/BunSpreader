@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
     let body = serde_json::to_string(&body)?;
 
     for i in 0..args.count {
-        if i % 10 == 0 {
+        if i % 100000 == 0 {
             println!("look at my i {}", i);
         }
 

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+garb=$(cat $1 | jq | grep garbag -A 6 | grep hitCount | sed 's/.*: \(.*\),/\1/')
+tots_mc_goats=$(cat $1 | jq | grep hitCount | awk ' { print $2 }' | tr \\n, +\  | sed 's/\(.*\)+$/\1/' | xargs | bc)
+
+echo $(echo "$garb.0 / $tots_mc_goats.0" | bc -l)
+
