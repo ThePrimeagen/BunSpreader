@@ -3,9 +3,13 @@
 !dist/*
 !dist/src/*
 !src/*
+!cmd/*
+!pkg/*
 !package.fastify.json
 !tsconfig.json
 !package.json
 !Cargo.toml
 !Cargo.lock
+!go.mod
+!go.sum
 
