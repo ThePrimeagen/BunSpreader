@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/ThePrimeagen/BunSpreader/pkg/queue"
 	"github.com/gin-gonic/gin"
@@ -32,18 +33,18 @@ func main() {
 			return
         }
 
-        node := queue.NewNode(queue.QueueMessage {
+        node := queue.QueueMessage {
             Time: queue.MakeTimestamp() + int64(tiq),
             Message: json,
-        })
+        }
 
-        q.Enqueue(node)
+        q.Enqueue(&node)
 		c.String(200, fmt.Sprintf("time in queue will be %v", tiq))
     })
 
 	r.GET("/status", func(c *gin.Context) {
         q.EmptyQueue()
-		c.String(200, strconv.Itoa(q.Length))
+		c.String(200, strconv.Itoa(int(atomic.LoadInt32(&q.Length))))
 	})
 
     r.Run("0.0.0.0:3000") // listen and serve on 0.0.0.0:3000
