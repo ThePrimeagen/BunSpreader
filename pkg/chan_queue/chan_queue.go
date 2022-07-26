@@ -1,6 +1,7 @@
-package queue
+package chan_queue
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -30,8 +31,7 @@ type Node struct {
 }
 
 type Queue struct {
-    Length int
-
+    length int
     head *Node
     tail *Node
     lock sync.Mutex
@@ -41,12 +41,27 @@ func NewQueue() *Queue {
     return &Queue {0, nil, nil, sync.Mutex{}}
 }
 
-func (q *Queue) Enqueue(message *QueueMessage) {
-    q.lock.Lock()
-    defer q.lock.Unlock()
+func (q *Queue) Run(ctx context.Context, wg *sync.WaitGroup, in chan *QueueMessage, out chan int, empty chan bool, status chan bool) {
+    defer wg.Done()
 
-	node := NewNode(*message)
-    q.Length += 1
+    for {
+        select {
+        case message := <- in:
+            q.enqueue(message)
+        case <- empty:
+            q.emptyQueue()
+        case <- status:
+            q.emptyQueue()
+            out <- q.length
+        case <- ctx.Done():
+			return
+        }
+    }
+}
+
+func (q *Queue) enqueue(message *QueueMessage) {
+    node := NewNode(*message)
+    q.length += 1
 
     if q.head == nil {
         q.head = node
@@ -64,7 +79,7 @@ func (q *Queue) deque() *Node {
         return nil
     }
 
-    q.Length -= 1
+    q.length -= 1
 
     out := q.head
     q.head = q.head.next
@@ -77,13 +92,7 @@ func MakeTimestamp() int64 {
     return time.Now().UnixMilli()
 }
 
-func (q *Queue) length() {
-}
-
-func (q *Queue) EmptyQueue() {
-    q.lock.Lock()
-    defer q.lock.Unlock()
-
+func (q *Queue) emptyQueue() {
     now := MakeTimestamp()
 
     for {
