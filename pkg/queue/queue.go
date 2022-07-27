@@ -6,17 +6,17 @@ import (
 )
 
 type InnerMessage struct {
-    width int
-    height int
-    girth int
-    depth int
-    length int
-    circumference int
+    Width int   `json:"width"`
+    Height int  `json:"height"`
+    Girth int   `json:"girth"`
+    Depth int   `json:"depth"`
+    Length int  `json:"length"`
+    Circumference int   `json:"circumference"`
 }
 
 type Message struct {
-    message string
-    another_property InnerMessage
+    Message string  `json:"message"`
+    AnotherProperty InnerMessage `json:"another_property"`
 }
 
 type QueueMessage struct {
