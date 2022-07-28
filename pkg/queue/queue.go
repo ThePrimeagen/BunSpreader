@@ -49,6 +49,7 @@ func (q *Queue) Enqueue(qm QueueMessage) {
 		node = &Node{}
 	}
 	node.data = qm
+	node.next = nil
 
 	q.lock.Lock()
 	defer q.lock.Unlock()
