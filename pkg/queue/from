@@ -1,4 +1,0 @@
-BenchmarkQueue-4            1526           1605576 ns/op          800035 B/op      10001 allocs/op
-BenchmarkQueue-4            1762            670270 ns/op           12831 B/op        112 allocs/op
-
-
