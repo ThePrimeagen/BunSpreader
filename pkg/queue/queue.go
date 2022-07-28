@@ -6,99 +6,99 @@ import (
 )
 
 type InnerMessage struct {
-    width int
-    height int
-    girth int
-    depth int
-    length int
-    circumference int
+	width         int
+	height        int
+	girth         int
+	depth         int
+	length        int
+	circumference int
 }
 
 type Message struct {
-    message string
-    another_property InnerMessage
+	message          string
+	another_property InnerMessage
 }
 
 type QueueMessage struct {
-    Time int64
-    Message Message
+	Time    int64
+	Message Message
 }
 
 type Node struct {
-    data QueueMessage
-    next *Node
+	data QueueMessage
+	next *Node
 }
 
 type Queue struct {
-    Length int
+	Length int32
 
-    head *Node
-    tail *Node
-    lock sync.Mutex
+	head *Node
+	tail *Node
+	lock sync.Mutex
+	pool sync.Pool
 }
 
 func NewQueue() *Queue {
-    return &Queue {0, nil, nil, sync.Mutex{}}
+	return &Queue{0, nil, nil, sync.Mutex{}, sync.Pool{}}
 }
 
-func (q *Queue) Enqueue(node *Node) {
-    q.lock.Lock()
-    defer q.lock.Unlock()
+func (q *Queue) Enqueue(qm QueueMessage) {
+	var node *Node
+	node, ok := q.pool.Get().(*Node)
+	if !ok {
+		node = &Node{}
+	}
+	node.data = qm
 
-    q.Length += 1
+	q.lock.Lock()
+	defer q.lock.Unlock()
 
-    if q.head == nil {
-        q.head = node
-        q.tail = node
-        return
-    }
+	q.Length += 1
 
-    q.tail.next = node
-    q.tail = q.tail.next
+	if q.head == nil {
+		q.head = node
+		q.tail = node
+		return
+	}
+
+	q.tail.next = node
+	q.tail = q.tail.next
 }
 
 func (q *Queue) deque() *Node {
 
-    if q.head == nil {
-        return nil
-    }
+	if q.head == nil {
+		return nil
+	}
 
-    q.Length -= 1
+	q.Length -= 1
 
-    out := q.head
-    q.head = q.head.next
+	out := q.head
+	q.head = q.head.next
 
-    out.next = nil
-    return out
+	out.next = nil
+	return out
 }
 
 func MakeTimestamp() int64 {
-    return time.Now().UnixMilli()
+	return time.Now().UnixMilli()
 }
 
 func (q *Queue) length() {
 }
 
 func (q *Queue) EmptyQueue() {
-    q.lock.Lock()
-    defer q.lock.Unlock()
+	q.lock.Lock()
+	defer q.lock.Unlock()
 
-    now := MakeTimestamp()
+	now := MakeTimestamp()
 
-    for {
-        node := q.head
-        if node != nil && node.data.Time < now {
-            q.deque()
-        } else {
-            break;
-        }
-    }
+	for {
+		node := q.head
+		if node != nil && node.data.Time < now {
+			q.pool.Put(q.deque())
+		} else {
+			break
+		}
+	}
 }
-
-func NewNode(data QueueMessage) *Node {
-    return &Node {
-        data: data,
-        next: nil,
-    }
-}
-

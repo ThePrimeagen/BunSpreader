@@ -38,7 +38,7 @@ func main() {
             Message: json,
         }
 
-        q.Enqueue(&node)
+        q.Enqueue(node)
 		c.String(200, fmt.Sprintf("time in queue will be %v", tiq))
     })
 
