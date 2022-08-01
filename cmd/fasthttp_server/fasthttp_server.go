@@ -1,28 +1,55 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"encoding/json"
+	"sync"
 
-	"github.com/ThePrimeagen/BunSpreader/pkg/queue"
+	queue "github.com/ThePrimeagen/BunSpreader/pkg/pool_queue"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttprouter"
 )
 
+
+func getPools() (sync.Pool, sync.Pool) {
+	messagePool := sync.Pool{
+		New: func() interface{} {
+			return &queue.Message{}
+	}}
+	queueMessagePool := sync.Pool{
+		New: func() interface{} {
+			return &queue.QueueMessage{}
+	}}
+
+	// fill some pools
+	ms := make([]*queue.Message, 1000000)
+	qms := make([]*queue.QueueMessage, 1000000)
+	for i := 0; i < 1000000; i++ {
+		ms[i] = messagePool.Get().(*queue.Message)
+		qms[i] = queueMessagePool.Get().(*queue.QueueMessage)
+	}
+	for i := 0; i < 1000000; i++ {
+		messagePool.Put(ms[i])
+		queueMessagePool.Put(qms[i])
+	}
+	return messagePool, queueMessagePool
+}
+
 func main () {
 	r := fasthttprouter.New()
-	q := queue.NewQueue()
+	messagePool, queueMessagePool := getPools()
+	q := queue.NewQueue(messagePool, queueMessagePool)
 
 	r.POST("/json/:timeInQueue", func(ctx *fasthttp.RequestCtx, ps fasthttprouter.Params) {
         q.EmptyQueue()
 
 		timeInQueue := ps.ByName("timeInQueue")
-        var jsonMsg queue.Message
+        jsonMsg := messagePool.Get().(*queue.Message)
 
 		body := ctx.PostBody()
-		err := json.Unmarshal(body, &jsonMsg)
+		err := json.Unmarshal(body, jsonMsg)
 		if err != nil {
 			ctx.Error(err.Error(), http.StatusBadRequest)
 			return
@@ -34,12 +61,11 @@ func main () {
 			return
         }
 
-        message := queue.QueueMessage {
-            Time: queue.MakeTimestamp() + int64(tiq),
-            Message: jsonMsg,
-        }
+		message := queueMessagePool.Get().(*queue.QueueMessage)
+        message.Time = queue.MakeTimestamp() + int64(tiq)
+		message.Message = jsonMsg
 
-        q.Enqueue(&message)
+        q.Enqueue(message)
 		fmt.Fprintf(ctx, "time in queue will be %v", tiq)
     })
 
