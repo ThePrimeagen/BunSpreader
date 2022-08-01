@@ -1,4 +1,4 @@
-package queue
+package pool_queue
 
 import (
 	"sync"
@@ -21,7 +21,7 @@ type Message struct {
 
 type QueueMessage struct {
     Time int64
-    Message Message
+    Message *Message
 }
 
 type Node struct {
@@ -35,10 +35,13 @@ type Queue struct {
     head *Node
     tail *Node
     lock sync.Mutex
+
+    messagePool sync.Pool
+    queueMessagePool sync.Pool
 }
 
-func NewQueue() *Queue {
-    return &Queue {0, nil, nil, sync.Mutex{}}
+func NewQueue(messagePool sync.Pool, queueMessagePool sync.Pool) *Queue {
+    return &Queue {0, nil, nil, sync.Mutex{}, messagePool, queueMessagePool}
 }
 
 func (q *Queue) Enqueue(message *QueueMessage) {
@@ -89,7 +92,9 @@ func (q *Queue) EmptyQueue() {
     for {
         node := q.head
         if node != nil && node.data.Time < now {
-            q.deque()
+            out := q.deque()
+            q.messagePool.Put(out.data.Message)
+            q.queueMessagePool.Put(&out.data)
         } else {
             break;
         }
